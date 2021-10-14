@@ -1,64 +1,72 @@
 import java.net.Socket;
-import java.net.SocketException;
-import java.io.OutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.TimeoutException;
+import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.IOException;
+
 
 public class Client {
-    public static void main(String[] argv){
+    public static void main(String[] argv)throws IOException{
         try{
             Socket s = new Socket("localhost", 2220);
-            
+            s.setSoTimeout(1000);
+            s.setTcpNoDelay(true);
             OutputStream out = s.getOutputStream();
             InputStream in = s.getInputStream();
-            byte[] msg = new byte[17];
-            s.setTcpNoDelay(true);
-            s.setSoTimeout(1000);
-            
-            
-            msg[0] = 1;//version 1
-            msg[1] = 0;//type 0 (subscribe)
-            msg[2] = 15;//length 15
-            
-            msg[3] = 5;//length 5 : "cyril"
-            String client_name = new String("cyril");
-            byte[] client_name_encode_utf8 = client_name.getBytes(StandardCharsets.UTF_8);
-            for(int i = 4; i<9; i++)
-                msg[i] = client_name_encode_utf8[i-4];
-            // msg[4] =
-            // msg[5] =
-            // msg[6] =
-            // msg[7] =
-            // msg[8] =
-            msg[9] = 7;//length 7 : "victory"
-            String sub_topic = new String("victory");
-            byte[] sub_topic_encode_utf8 = sub_topic.getBytes(StandardCharsets.UTF_8);
-            for(int i = 10; i<17; i++)
-                msg[i] = sub_topic_encode_utf8[i-10];
-            
-            
-            out.write(msg);
-            out.flush();
+
+            try{
+                byte[] complete_msg = new MHP().create_subscription_msg("cyril", "victory");
+                out.write(complete_msg);
+                out.flush();
+            }
+            catch(SizeMessageError e){
+                s.close();
+                return;
+            }
+
             
             byte[] received_msg = new byte[64];
-            while(true){
+            while (true) {
                 int len = in.read(received_msg);
-                if(len<=0)
+                if (len <= 0)
                     break;
-                System.out.println(len);
-                for(int i = 0; i<len; i++)
+                for (int i = 0; i < len; i++)
                     System.out.println(received_msg[i]);
+                if (len == 6)
+                    break;
+            }
+            
+
+            try {
+                byte[] complete_msg = new MHP().create_subscription_msg("cyril", "position");
+                out.write(complete_msg);
+                out.flush();
+            }
+            catch (SizeMessageError e) {
+                s.close();
+                return;
+            }
+
+            while (true) {
+                int len = in.read(received_msg);
+                if (len <= 0)
+                    break;
+                for (int i = 0; i < len; i++)
+                    System.out.println(received_msg[i]);
+                if(len==6)
+                    break;
             }
 
             s.close();
         }
-        catch(SocketException e){
-            System.out.println("time exceded\n");
+        catch (SocketTimeoutException e){
+            System.out.println("no more message to receive.\n");
         }
         catch(IOException e){
-            System.out.println("IO problém\n");
+            System.out.println("IO Exception\n");
         }
+
+        System.out.println("program keep going\n");
     }
 }
