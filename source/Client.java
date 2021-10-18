@@ -36,7 +36,7 @@ public class Client {
             out.write(complete_msg);
             out.flush();
         }
-        catch (SizeMessageError e) {
+        catch (SizeMessageError e){
             s.close();
             return;
         }
