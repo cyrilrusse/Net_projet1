@@ -2,37 +2,93 @@ import java.nio.charset.StandardCharsets;
 
 public class MHP {
     
+    public byte[] createGuessMsg(String guess){
 
-    public byte[] createSubscriptionMsg(String client_name, String sub_topic)throws SizeMessageError{
-        byte name_length = (byte) client_name.length();
-        byte sub_topic_length = (byte) sub_topic.length();
-        byte total_length = (byte) (name_length + sub_topic_length + 2);//word_length + words
-        
-        //header array for subscription
-        byte[] header = new byte[3];
-        header[0] = 1;// version 1
-        header[1] = 0;// type 0 (subscribe)
-        header[2] = (byte) total_length;
+        try{
+            return createMsg("guess", guess, (byte)1);
+        }
+        catch (SizeMessageError e) {
+            return null;
+        }
+    }
 
-        if((total_length+3)>255)throw new SizeMessageError("Maximum message size exceeded");
+    public byte[] createSubscriptionMsg(String client_name, String sub_topic){
+        try{
+            return createMsg(client_name, sub_topic, (byte)0);
+        }
+        catch (SizeMessageError e) {
+            return null;
+        }
+    }
 
-        byte[] msg = new byte[total_length];
+    public byte[] createAckMsg(boolean ok){
+        String ack_string;
+        if(ok)
+            ack_string = new String("OK");
+        else
+            ack_string = new String("ERROR");
 
-        msg[0] = name_length;
+        try{
+            return createMsg(ack_string, null, (byte)2);
+        }
+        catch(SizeMessageError e){
+            return null;
+        }
 
-        byte[] client_name_encode_utf8 = client_name.getBytes(StandardCharsets.UTF_8);
+    }
 
-        System.arraycopy(client_name_encode_utf8, 0, msg, 1, name_length);
+    static byte[] createMsg(String word1, String word2, byte type)throws SizeMessageError{
+        byte word1_length = (byte) word1.length();
+        byte payload_length;
+        if(word2!=null){
+            byte word2_length = (byte) word2.length();
+            payload_length = (byte) (word1_length + word2_length + 2);// words_length + words
+        }
+        else
+            payload_length = (byte) (word1_length + 1);
 
-        msg[name_length + 1] = sub_topic_length;
-        byte[] sub_topic_encode_utf8 = sub_topic.getBytes(StandardCharsets.UTF_8);
-        System.arraycopy(sub_topic_encode_utf8, 0, msg, name_length + 2, sub_topic_length);
+        if ((payload_length + 3) > 258)
+            throw new SizeMessageError("Maximum message size exceeded");
 
-        byte[] complete_msg = new byte[total_length + 3];// msg+header
+        // header array for subscription
+        byte[] header = createHeader(type, payload_length);
+
+        // payload
+        byte[] payload = createPayload(word1, word2, payload_length);
+
+        // concatenate the payload and the header
+        byte[] complete_msg = new byte[payload_length + 3];
         System.arraycopy(header, 0, complete_msg, 0, 3);
-        System.arraycopy(msg, 0, complete_msg, 3, total_length);
+        System.arraycopy(payload, 0, complete_msg, 3, payload_length);
 
         return complete_msg;
+    }
+
+    static byte[] createHeader(byte type_msg, byte payload_length){
+        return new byte[]{(byte)1, type_msg, payload_length};
+    }
+
+    static byte[] createPayload(String word1, String word2, byte payload_length){
+        byte[] payload = new byte[(int)payload_length];
+        byte word1_length = (byte)word1.length();
+        
+        
+        payload[0] = word1_length;
+        
+        byte[] word1_encode_utf8 = word1.getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(word1_encode_utf8, 0, payload, 1, word1_length);
+        
+        if(word2==null)
+            return payload;
+
+        byte word2_length = (byte)word2.length();
+
+        payload[word1_length + 1] = word2_length;
+
+        byte[] word2_encode_utf8 = word2.getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(word2_encode_utf8, 0, payload, word1_length + 2, word2_length);
+
+        return payload;
     }
 
 }

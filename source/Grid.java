@@ -73,51 +73,6 @@ public class Grid {
 
     }
 
-    public void intersection(byte[] sensor_position, byte range) {
-
-        if (sensor_position[0] < 65 || sensor_position[0] > 74) {
-            System.out.println("1");
-            return;
-        }
-        int int_range = range;
-        int_range -= 48;
-
-        if (int_range < 1 || int_range > 3) {
-            System.out.println("2");
-        }
-        int letter_to_digit = sensor_position[0] - 64;
-        int sensor_position_digit = sensor_position[1] - 48;
-        if (sensor_position_digit < 1 || sensor_position_digit > 10) {
-            System.out.println("3");
-            return;
-        }
-
-        System.out.println("coucou");
-        int[] square_sensor = new int[4];
-        square_sensor[0] = letter_to_digit - int_range;
-        if (square_sensor[0] < 1)
-            square_sensor[0] = 1;
-        square_sensor[1] = letter_to_digit + int_range;
-        if (square_sensor[1] > 10)
-            square_sensor[1] = 10;
-        square_sensor[2] = sensor_position_digit - int_range;
-        if (square_sensor[2] < 1)
-            square_sensor[2] = 1;
-        square_sensor[3] = sensor_position_digit + int_range;
-        if (square_sensor[3] > 10)
-            square_sensor[3] = 10;
-
-        if (square_sensor[0] > possible_monster_position[0])
-            possible_monster_position[0] = square_sensor[0];
-        if (square_sensor[1] < possible_monster_position[1])
-            possible_monster_position[1] = square_sensor[1];
-        if (square_sensor[2] > possible_monster_position[2])
-            possible_monster_position[2] = square_sensor[2];
-        if (square_sensor[3] < possible_monster_position[3])
-            possible_monster_position[3] = square_sensor[3];
-
-    }
-
 
     public void display(){
         System.out.print("   ");
@@ -150,12 +105,4 @@ public class Grid {
         System.out.print("\n");
     }
 
-
-
-    
-
-
-    
-
-    
 }
