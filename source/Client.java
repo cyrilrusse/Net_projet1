@@ -1,4 +1,5 @@
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.io.OutputStream;
 import java.io.IOException;
 
@@ -49,6 +50,29 @@ public class Client {
         reader.read_message();
         msg = reader.getMessage();
         System.out.println(msg);
+
+
+
+
+
+        Grid grid = new Grid();
+        grid.reset();
+        boolean read = true;
+        String position = "";
+        while(true){
+            reader = new Reader(s);
+            read = reader.read_message();
+            if(!read)
+                break;
+            while(reader.messageToDecodeRemaining()){
+                position = reader.getPositionMessage();
+                if(position==null)
+                    break;
+                grid.intersectionString(position);
+            }
+        }
+        grid.display();
+
 
         s.close();
 

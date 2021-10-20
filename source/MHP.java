@@ -16,11 +16,6 @@ public class MHP {
 
         if((total_length+3)>255)throw new SizeMessageError("Maximum message size exceeded");
 
-        // String client_name = new String("cyril");
-        // String sub_topic = new String("victory");
-        
-
-
         byte[] msg = new byte[total_length];
 
         msg[0] = name_length;
