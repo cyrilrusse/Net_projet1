@@ -2,7 +2,6 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 
-
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -70,7 +69,6 @@ public class Reader {
             i+=size_word+1;
         }
 
-
         return msg;
     }
 
@@ -95,18 +93,41 @@ public class Reader {
         if(!(test.equals("position")))
             System.out.print("Not a message position.\n");
 
-        byte[] second_word = new byte[5];
         int position_second_word = taille_first_word+5;
-        int taile_2_word = msg_to_decode[taille_first_word+4];
-        System.arraycopy(msg_to_decode, position_second_word, second_word, 0, taile_2_word);
+        int taile_second_word = msg_to_decode[taille_first_word+4];
+        byte[] second_word = new byte[taile_second_word];
+        System.arraycopy(msg_to_decode, position_second_word, second_word, 0, taile_second_word);
 
-        computeNextMessageIndex();
+        this.computeNextMessageIndex();
 
         return new String(second_word, StandardCharsets.UTF_8);        
     }
 
+    public Message decodeMessage(){
+        String[] words = new String[2];
+        int payload_length = byte_received[position_message+2];
+        int total_length = payload_length +3;
+        byte[] msg_to_decode = new byte[total_length];
+        int i = 3, number_word = 0, word_length;
+        byte[] word_byte;
+
+
+
+        while(i<total_length){
+            word_length = msg_to_decode[i++];
+            word_byte = new byte[word_length];
+            System.arraycopy(msg_to_decode, i, word_byte, 0, word_length);
+            words[number_word++] = new String(word_byte, StandardCharsets.UTF_8);
+            i+=word_length;
+        }
+        if(i>total_length || number_word!=2)
+            return null;
+        
+        return new Message(msg_to_decode[1], words, number_word);
+    }
+
     public void computeNextMessageIndex(){
-        this.position_message += byte_received[position_message+2]+3;
+        this.position_message += this.byte_received[position_message+2]+3;
     }
 
 }

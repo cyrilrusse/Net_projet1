@@ -2,7 +2,14 @@ import java.nio.charset.StandardCharsets;
 
 public class MHP {
     
-    public byte[] createGuessMsg(String guess){
+    public byte[] createGuessMsg(String guess)throws MessageException{
+        int length = guess.length();
+        if(length>3 || length<2 || guess.charAt(0)<'A' || guess.charAt(0)>'J')
+            throw new MessageException("Wrong format for your guess.");
+        if(guess.charAt(1)<'1'||guess.charAt(1)>'9')
+            throw new MessageException("Wrong format for your guess.");
+        if(length==3 && (guess.charAt(1)!='1' || guess.charAt(2)!='0'))
+            throw new MessageException("Wrong format for your guess.");
 
         try{
             return createMsg("guess", guess, (byte)1);

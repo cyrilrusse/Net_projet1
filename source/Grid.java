@@ -10,8 +10,6 @@ public class Grid {
 
     public void intersectionString(String sensor_position){
         String[] position_split = sensor_position.split(":");
-        // System.out.println(position_split[0]);
-        // System.out.println(position_split[1]);
 
 
         if(position_split[0].length()>3)
