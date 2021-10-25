@@ -1,5 +1,6 @@
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+
 import java.nio.charset.StandardCharsets;
 
 import java.io.IOException;
@@ -21,13 +22,11 @@ public class Reader {
         return false;
     }
 
-    public boolean read_message(){
+    public boolean read_message(InputStream in){
         try{
             this.s.setSoTimeout(1000);
             this.s.setTcpNoDelay(true);
             
-            InputStream in = this.s.getInputStream();
-
             byte[] new_input = new byte[258];
             int len = in.read(new_input);
 
@@ -37,7 +36,6 @@ public class Reader {
             
         }
         catch(SocketTimeoutException e){
-            System.out.println("Time exceeded.\n");
             return false;
         }
         catch(IOException e){
@@ -103,7 +101,7 @@ public class Reader {
         return new String(second_word, StandardCharsets.UTF_8);        
     }
 
-    public Message decodeMessage(){
+    public Message decodeMessage()throws MessageException{
         String[] words = new String[2];
         int payload_length = byte_received[position_message+2];
         int total_length = payload_length +3;
@@ -111,18 +109,18 @@ public class Reader {
         int i = 3, number_word = 0, word_length;
         byte[] word_byte;
 
-
-
-        while(i<total_length){
+        System.arraycopy(byte_received, position_message, msg_to_decode, 0, total_length);
+        
+        while(number_word<2 && i<total_length){
             word_length = msg_to_decode[i++];
             word_byte = new byte[word_length];
             System.arraycopy(msg_to_decode, i, word_byte, 0, word_length);
             words[number_word++] = new String(word_byte, StandardCharsets.UTF_8);
             i+=word_length;
         }
-        if(i>total_length || number_word!=2)
-            return null;
-        
+        if(i>total_length || number_word>2)
+            throw new MessageException("Unexpected format received.");
+
         return new Message(msg_to_decode[1], words, number_word);
     }
 

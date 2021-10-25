@@ -14,7 +14,7 @@ public class MHP {
         try{
             return createMsg("guess", guess, (byte)1);
         }
-        catch (SizeMessageError e) {
+        catch (MHPException e) {
             return null;
         }
     }
@@ -23,7 +23,7 @@ public class MHP {
         try{
             return createMsg(client_name, sub_topic, (byte)0);
         }
-        catch (SizeMessageError e) {
+        catch (MHPException e) {
             return null;
         }
     }
@@ -38,13 +38,24 @@ public class MHP {
         try{
             return createMsg(ack_string, null, (byte)2);
         }
-        catch(SizeMessageError e){
+        catch(MHPException e){
             return null;
         }
 
     }
 
-    static byte[] createMsg(String word1, String word2, byte type)throws SizeMessageError{
+    public boolean checkAck(Message message)throws MHPException{
+        if(message.getType()!=2)throw new  MHPException("Not an ack Message");
+        
+        if(message.getNbrOfWords()==1 && message.getWordAt(0).equals("OK"))
+            return true;
+        else if(message.getNbrOfWords()<2 && message.getWordAt(0).equals("ERROR"))
+            return false;
+        else 
+            throw new MHPException("Not an ack Message");        
+    }
+
+    static byte[] createMsg(String word1, String word2, byte type)throws MHPException{
         byte word1_length = (byte) word1.length();
         byte payload_length;
         if(word2!=null){
@@ -55,7 +66,7 @@ public class MHP {
             payload_length = (byte) (word1_length + 1);
 
         if ((payload_length + 3) > 258)
-            throw new SizeMessageError("Maximum message size exceeded");
+            throw new MHPException("Maximum message size exceeded");
 
         // header array for subscription
         byte[] header = createHeader(type, payload_length);
@@ -100,7 +111,7 @@ public class MHP {
 
 }
 
-class SizeMessageError extends Exception{
-    public SizeMessageError()           {super();}
-    public SizeMessageError(String s)   {super(s);}
+class MHPException extends Exception{
+    public MHPException()           {super();}
+    public MHPException(String s)   {super(s);}
 }
