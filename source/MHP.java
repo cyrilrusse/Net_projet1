@@ -2,46 +2,30 @@ import java.nio.charset.StandardCharsets;
 
 public class MHP {
     
-    public byte[] createGuessMsg(String guess)throws MessageException{
+    public byte[] createGuessMsg(String guess)throws MHPException{
         int length = guess.length();
         if(length>3 || length<2 || guess.charAt(0)<'A' || guess.charAt(0)>'J')
-            throw new MessageException("Wrong format for your guess.");
+            throw new MHPException("Wrong format for your guess.");
         if(guess.charAt(1)<'1'||guess.charAt(1)>'9')
-            throw new MessageException("Wrong format for your guess.");
+            throw new MHPException("Wrong format for your guess.");
         if(length==3 && (guess.charAt(1)!='1' || guess.charAt(2)!='0'))
-            throw new MessageException("Wrong format for your guess.");
+            throw new MHPException("Wrong format for your guess.");
 
-        try{
-            return createMsg("guess", guess, (byte)1);
-        }
-        catch (MHPException e) {
-            return null;
-        }
+        return createMsg("guess", guess, (byte)1);
     }
 
-    public byte[] createSubscriptionMsg(String client_name, String sub_topic){
-        try{
-            return createMsg(client_name, sub_topic, (byte)0);
-        }
-        catch (MHPException e) {
-            return null;
-        }
+    public byte[] createSubscriptionMsg(String client_name, String sub_topic)throws MHPException{
+        return createMsg(client_name, sub_topic, (byte)0);
     }
 
-    public byte[] createAckMsg(boolean ok){
+    public byte[] createAckMsg(boolean ok)throws MHPException{
         String ack_string;
         if(ok)
             ack_string = new String("OK");
         else
             ack_string = new String("ERROR");
 
-        try{
-            return createMsg(ack_string, null, (byte)2);
-        }
-        catch(MHPException e){
-            return null;
-        }
-
+        return createMsg(ack_string, null, (byte)2);
     }
 
     public boolean checkAck(Message message)throws MHPException{
@@ -55,7 +39,7 @@ public class MHP {
             throw new MHPException("Not an ack Message");        
     }
 
-    static byte[] createMsg(String word1, String word2, byte type)throws MHPException{
+    private byte[] createMsg(String word1, String word2, byte type)throws MHPException{
         byte word1_length = (byte) word1.length();
         byte payload_length;
         if(word2!=null){
@@ -66,7 +50,9 @@ public class MHP {
             payload_length = (byte) (word1_length + 1);
 
         if ((payload_length + 3) > 258)
-            throw new MHPException("Maximum message size exceeded");
+            throw new MHPException("Maximum message size exceeded to create a message.");
+        else if(payload_length==0)
+            throw new MHPException("Word size error while creating message.");
 
         // header array for subscription
         byte[] header = createHeader(type, payload_length);
@@ -82,11 +68,11 @@ public class MHP {
         return complete_msg;
     }
 
-    static byte[] createHeader(byte type_msg, byte payload_length){
+    private byte[] createHeader(byte type_msg, byte payload_length){
         return new byte[]{(byte)1, type_msg, payload_length};
     }
 
-    static byte[] createPayload(String word1, String word2, byte payload_length){
+    private byte[] createPayload(String word1, String word2, byte payload_length){
         byte[] payload = new byte[(int)payload_length];
         byte word1_length = (byte)word1.length();
         
@@ -109,9 +95,4 @@ public class MHP {
         return payload;
     }
 
-}
-
-class MHPException extends Exception{
-    public MHPException()           {super();}
-    public MHPException(String s)   {super(s);}
 }

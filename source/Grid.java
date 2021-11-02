@@ -73,6 +73,7 @@ public class Grid {
 
 
     public void display(){
+        System.out.print("The monster is situated somewhere on the tiles marked by a cross\n");
         System.out.print("   ");
         for(int i = 1; i<11; i++)
             System.out.print(i+"  ");

@@ -7,8 +7,10 @@ import java.util.*;
 
 public class Client {
 
-    public static void clean(Socket s, Scanner guess_entry){
+    private static void clean(Socket s, Scanner guess_entry, InputStream in, OutputStream out){
         try{
+            in.close();
+            out.close();
             guess_entry.close();
             s.close();
         }
@@ -17,14 +19,22 @@ public class Client {
         }
     }
     
-    public static boolean sendSub(OutputStream out, String sub_topic){
+    private static void sendSub(OutputStream out, String sub_topic)throws IOException, MHPException{
         byte[] subscription_msg;
+        subscription_msg = new MHP().createSubscriptionMsg("cyril", sub_topic);
+        out.write(subscription_msg);
+        out.flush();
+    }
+
+    private static boolean sendAck(OutputStream out, boolean ack){
         try {
-            subscription_msg = new MHP().createSubscriptionMsg("cyril", sub_topic);
-            out.write(subscription_msg);
+            out.write(new MHP().createAckMsg(true));
             out.flush();
         } catch (IOException e) {
-            System.out.println("Error while sending subscription message.");
+            System.out.println("Error while sending ACK message.");
+            return false;
+        } catch (MHPException e) {
+            System.out.println("Couldn't create ACK message.");
             return false;
         }
         return true;
@@ -41,22 +51,21 @@ public class Client {
         Scanner guess_entry = new Scanner(System.in);
         Reader reader;
         String input;
-        Boolean in_game = true;
+        Boolean in_game = true; 
         InputStream in;
         OutputStream out;
+        Message message_decoded;
         
-        
+        // Connection
         try{
             s = new Socket("localhost", port);
             out = s.getOutputStream();
             in = s.getInputStream();
-        }
-        catch(UnknownHostException e){
+        }catch(UnknownHostException e){
             System.out.println("Error : Unknown host.");
             guess_entry.close();
             return;
-        }
-        catch(IOException e){
+        }catch(IOException e){
             System.out.println("Error while creating socket.");
             guess_entry.close();
             return;
@@ -64,147 +73,213 @@ public class Client {
         
         
         // Subscription to victory topic
-        if(!sendSub(out, "victory")){
-            clean(s, guess_entry);
+        try {
+            sendSub(out, "victory");
+        } catch (Exception e) {
+            System.out.println("Error while sending subscription message.");
+            clean(s, guess_entry, in, out);
             return;
         }
         
-        // Read ACK
+        // Read Subscription ACK
         reader = new Reader(s);
-        reader.read_message(in);
-        Message message_decoded;
+        try{
+            if(!reader.read_message(in)){
+                System.out.println("Connection might have been closed by the broker.");
+                clean(s, guess_entry, in, out);
+                return;
+            }
+        }catch(IOException e){
+            System.out.println("Error with inputstream reader.");
+            clean(s, guess_entry, in, out);
+            return;
+        }
+        
+        //check ACK
         try{
             message_decoded = reader.decodeMessage();
             if(!new MHP().checkAck(message_decoded)){
-                clean(s, guess_entry);
+                clean(s, guess_entry, in, out);
                 System.out.println("Error received while subscribing to victory topic.");
+                if (message_decoded.getNbrOfWords() == 2)
+                    System.out.println(message_decoded.words[1]);
                 return;
             }
-        }
-        catch(MessageException e){
-            clean(s, guess_entry);
-            System.out.println("Unexpected format received.");
-            return;
-        }
-        catch(MHPException e){
-            clean(s, guess_entry);
+        } catch (MHPException e) {
+            clean(s, guess_entry, in, out);
             System.out.println("Wrong format of ack received.");
             return;
         }
 
         // Subscription to position topic
-        if(!sendSub(out, "position")){
-            clean(s, guess_entry);
+        try{
+            sendSub(out, "position");
+        } catch (Exception e) {
+            System.out.println("Error while sending subscription message.");
+            clean(s, guess_entry, in, out);
             return;
         }
 
-        // Read ACK
+        // Read Subscription ACK
         reader = new Reader(s);
-        reader.read_message(in);
+        try{
+            if(!reader.read_message(in)){
+                System.out.println("Connection might have been closed by the broker.");
+                clean(s, guess_entry, in, out);
+                return;
+            }
+        }catch(IOException e){
+            System.out.println("Error with inputstream reader.");
+            clean(s, guess_entry, in, out);
+            return;
+        }
+        
+        // check ACK
         try {
             message_decoded = reader.decodeMessage();
             if (!new MHP().checkAck(message_decoded)) {
-                clean(s, guess_entry);
-                System.out.println("Error received while subscribing to victory topic.");
+                clean(s, guess_entry, in, out);
+                System.out.println("Error received while subscribing to victory topic:");
+                if(message_decoded.getNbrOfWords()==2)
+                    System.out.println(message_decoded.words[1]);
                 return;
             }
-        } catch (MessageException e) {
-            clean(s, guess_entry);
-            System.out.println("Unexpected format received.");
-            return;
-        } catch (MHPException e) {
-            clean(s, guess_entry);
+        }catch (MHPException e) {
+            clean(s, guess_entry, in, out);
             System.out.println("Wrong format of ack received.");
             return;
         }
 
+        // Game
+        reader = new Reader(s);
+        Grid grid = new Grid();
+        String position;
+        boolean read = false;
+        message_decoded = null;
+
+        System.out.println("\nWelcome to the monster hunting game!\n");
+
         while(in_game){
-            Grid grid = new Grid();
             grid.reset();
-            boolean read = true;
-            String position = "";
-            reader = new Reader(s);
-            while(true){
-                read = reader.read_message(in);
-                if(!read)
-                    break;
-                while(reader.messageToDecodeRemaining()){
-                    position = reader.getPositionMessage();
-                    if(position==null)
-                        break;
-                    try{
-                    out.write(new MHP().createAckMsg(true));
-                    out.flush();
-                    }
-                    catch(IOException e){
-                        clean(s, guess_entry);
-                        return;
-                    }
-                    grid.intersectionString(position);
+            // Read all positions sent
+            while(!read){
+                try{
+                    read = reader.read_message(in);
                 }
+                catch(IOException e){
+                    System.out.println("Error with inputstream reader.");
+                    clean(s, guess_entry, in, out);
+                    return;
+                }
+            }
+
+            // Decode all position received
+            while(reader.messageToDecodeRemaining() || message_decoded!=null){
+                try{
+                    if(message_decoded==null)
+                        message_decoded = reader.decodeMessage();
+                    position = reader.getPositionMessage(message_decoded);
+                }catch(MHPException e){
+                    clean(s, guess_entry, in, out);
+                    System.out.println("Error while trying to decode an expected position message.");
+                    return;
+                }
+
+                // Send positive ACK
+                try{
+                out.write(new MHP().createAckMsg(true));
+                out.flush();
+                }
+                catch(IOException e){
+                    System.out.println("Error while sending ACK message.");
+                    clean(s, guess_entry, in, out);
+                    return;
+                }
+                catch(MHPException e){
+                    System.out.println("Couldn't create ACK message.");
+                    clean(s, guess_entry, in, out);
+                    return;
+                }
+
+                // Make the intersection with current sensors on the grid
+                grid.intersectionString(position);
+                message_decoded = null;
             }
             grid.display();
 
+            // Asking for a guess
             while(true){
-                System.out.print("Make a guess: ");
+                System.out.print("\nMake a guess: ");
                 input = guess_entry.nextLine();
                 try {
                     byte[] guess_msg = new MHP().createGuessMsg(input);
                     out.write(guess_msg);
                     out.flush();
                 }
-                catch(MessageException e){
-                    System.out.println("Please ensure to make your guess following the same format as the following example : C7.");
+                catch(MHPException e){
+                    System.out.println("\nPlease ensure to make your guess following the same format as the following example : C7.\n");
                     continue;
                 }
                 catch (IOException e) {
                     System.out.println("Error while sending guess message.");
-                    clean(s, guess_entry);
+                    clean(s, guess_entry, in, out);
                     return;
                 }
                 break;
             }
 
-            // Read ACK
+            // Read guess ACK 
             reader = new Reader(s);
-            reader.read_message(in);
-            try {
-                message_decoded = reader.decodeMessage();
-                if (!new MHP().checkAck(message_decoded)) {
-                    clean(s, guess_entry);
-                    System.out.println("Error received while subscribing to victory topic.");
-                    return;
-                }
-            } catch (MessageException e) {
-                clean(s, guess_entry);
-                System.out.println("Unexpected format received.");
-                return;
-            } catch (MHPException e) {
-                clean(s, guess_entry);
-                System.out.println("Wrong format of ack received.");
+            try{
+                reader.read_message(in);
+            }catch (IOException e) {
+                System.out.println("Error with inputstream reader.");
+                clean(s, guess_entry, in, out);
                 return;
             }
 
-            //
+            // Check ACK
+            try {
+                message_decoded = reader.decodeMessage();
+                if (!new MHP().checkAck(message_decoded)) {
+                    clean(s, guess_entry, in, out);
+                    System.out.println("Error ACK received while publishing guess.");
+                    return;
+                }
+            }catch (MHPException e) {
+                clean(s, guess_entry, in, out);
+                System.out.println("Message received was expected to be an ACK message.");
+                return;
+            }
+
+            // Read potential victory message
             reader = new Reader(s);
-            reader.read_message(in);
+            try{
+                reader.read_message(in);
+            }catch (IOException e) {
+                System.out.println("Error with inputstream reader.");
+                clean(s, guess_entry, in, out);
+                return;
+            }
+
+            // Check if victory message received and win if so
             try{
                 message_decoded = reader.decodeMessage();
             }
-            catch(MessageException e){
-                clean(s, guess_entry);
+            catch(MHPException e){
+                clean(s, guess_entry, in, out);
                 System.out.println("Unexpected format received.");
                 return;
             }
             if(message_decoded.getWordAt(0).equals("victory") && message_decoded.getWordAt(1).equals("victory!")){
+                System.out.println("\nYou got it!\n");
                 in_game = false;
-                System.out.println("You got it!");
             }
             else{
-                System.out.println("oops, try again...");
+                System.out.println("\noops, try again...\n");
             }
         }
 
-        clean(s, guess_entry);
+        clean(s, guess_entry, in, out);
     }
 }
