@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
-public class Client {
+public class Subscriber {
 
     private static void clean(Socket s, Scanner guess_entry, InputStream in, OutputStream out){
         try{
@@ -28,7 +28,7 @@ public class Client {
 
     private static boolean sendAck(OutputStream out, boolean ack){
         try {
-            out.write(new MHP().createAckMsg(true));
+            out.write(new MHP().createAckMsg(ack));
             out.flush();
         } catch (IOException e) {
             System.out.println("Error while sending ACK message.");
@@ -36,6 +36,27 @@ public class Client {
         } catch (MHPException e) {
             System.out.println("Couldn't create ACK message.");
             return false;
+        }
+        return true;
+    }
+
+    private static boolean requestGuess(OutputStream out, Scanner guess_entry){
+        while (true) {
+            System.out.print("\nMake a guess: ");
+            String input = guess_entry.nextLine();
+            try {
+                byte[] guess_msg = new MHP().createGuessMsg(input);
+                out.write(guess_msg);
+                out.flush();
+            } catch (MHPException e) {
+                System.out.println(
+                        "\nPlease ensure to make your guess following the same format as the following example : C7.\n");
+                continue;
+            } catch (IOException e) {
+                System.out.println("Error while sending guess message.");
+                return false;
+            }
+            break;
         }
         return true;
     }
@@ -50,7 +71,6 @@ public class Client {
         Socket s;
         Scanner guess_entry = new Scanner(System.in);
         Reader reader;
-        String input;
         Boolean in_game = true; 
         InputStream in;
         OutputStream out;
@@ -181,22 +201,13 @@ public class Client {
                     position = reader.getPositionMessage(message_decoded);
                 }catch(MHPException e){
                     clean(s, guess_entry, in, out);
+                    sendAck(out, false);
                     System.out.println("Error while trying to decode an expected position message.");
                     return;
                 }
 
                 // Send positive ACK
-                try{
-                out.write(new MHP().createAckMsg(true));
-                out.flush();
-                }
-                catch(IOException e){
-                    System.out.println("Error while sending ACK message.");
-                    clean(s, guess_entry, in, out);
-                    return;
-                }
-                catch(MHPException e){
-                    System.out.println("Couldn't create ACK message.");
+                if(!sendAck(out, true)){
                     clean(s, guess_entry, in, out);
                     return;
                 }
@@ -208,24 +219,10 @@ public class Client {
             grid.display();
 
             // Asking for a guess
-            while(true){
-                System.out.print("\nMake a guess: ");
-                input = guess_entry.nextLine();
-                try {
-                    byte[] guess_msg = new MHP().createGuessMsg(input);
-                    out.write(guess_msg);
-                    out.flush();
-                }
-                catch(MHPException e){
-                    System.out.println("\nPlease ensure to make your guess following the same format as the following example : C7.\n");
-                    continue;
-                }
-                catch (IOException e) {
-                    System.out.println("Error while sending guess message.");
-                    clean(s, guess_entry, in, out);
-                    return;
-                }
-                break;
+
+            if(!requestGuess(out, guess_entry)){
+                clean(s, guess_entry, in, out);
+                return;
             }
 
             // Read guess ACK 
@@ -277,6 +274,7 @@ public class Client {
             }
             else{
                 System.out.println("\noops, try again...\n");
+                read = false;
             }
         }
 
